@@ -1,0 +1,48 @@
+trigger:
+- master
+
+stages:
+- stage: build
+  jobs:
+  - job: build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: |
+        npm install
+      displayName: 'npm install'
+    - script: |
+        npx gatsby build
+      displayName: 'gatsby build'
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: '$(System.DefaultWorkingDirectory)/public/'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/website-$(Build.BuildId).zip'
+      displayName: 'archive website'
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/website-$(Build.BuildId).zip'
+        ArtifactName: 'website-drop-$(Build.BuildId)'
+      displayName: 'publish website artifact'
+
+- stage: 'deploy'
+  dependsOn: 'build'
+  condition: succeeded('build')
+  variables:
+    IpfsRootUrl: '<ROOT URL>' # Such as: http://ipfs-example.eastus2.azurecontainer.io
+  jobs:
+  - deployment: 'deploy'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'website-$(Build.SourceBranchName)'
+    strategy:
+      runOnce:
+        deploy: 
+          steps:
+          - task: ExtractFiles@1
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)/website-drop-$(Build.BuildId)/*.zip'
+              destinationFolder: '$(Pipeline.Workspace)/website-drop-$(Build.BuildId)/extracted'
+            displayName: 'extract website'

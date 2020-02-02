@@ -31,18 +31,24 @@ stages:
   dependsOn: 'build'
   condition: succeeded('build')
   variables:
-    IpfsRootUrl: '<ROOT URL>' # Such as: http://ipfs-example.eastus2.azurecontainer.io
+    IpfsRootUrl: '<IPFS NODE URL>' # Such as: http://ipfs-example.eastus2.azurecontainer.io:5001
   jobs:
-  - deployment: 'deploy'
-    pool:
-      vmImage: 'ubuntu-latest'
-    environment: 'website-$(Build.SourceBranchName)'
-    strategy:
-      runOnce:
-        deploy: 
-          steps:
-          - task: ExtractFiles@1
-            inputs:
-              archiveFilePatterns: '$(Pipeline.Workspace)/website-drop-$(Build.BuildId)/*.zip'
-              destinationFolder: '$(Pipeline.Workspace)/website-drop-$(Build.BuildId)/extracted'
-            displayName: 'extract website'
+    - deployment: 'deploy'
+      pool:
+        vmImage: 'ubuntu-latest'
+      environment: 'website-$(Build.SourceBranchName)'
+      strategy:
+        runOnce:
+          deploy: 
+            steps:
+            - task: ExtractFiles@1
+              inputs:
+                archiveFilePatterns: '$(Pipeline.Workspace)/website-drop-$(Build.BuildId)/*.zip'
+                destinationFolder: '$(System.DefaultWorkingDirectory)/website/'
+              displayName: 'extract website'
+            - script: |
+                sudo npm install -g ipfs-add-folder --ignore-scripts
+              displayName: 'install ipfs-add-folder'
+            - script: |
+                ipfs-add-folder "$(System.DefaultWorkingDirectory)/website/" "$(IpfsRootUrl)"
+              displayName: 'upload website'
